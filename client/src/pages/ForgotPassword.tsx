@@ -1,0 +1,426 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { Zap, Eye, EyeOff, AlertTriangle, CheckCircle2, X, ArrowRight, ArrowLeft, LogIn, Mail, KeyRound, ShieldCheck } from "lucide-react";
+import { ThemeToggleButton } from "@/components/ThemeToggleButton";
+import LightRays from "@/components/ui/LightRays";
+
+type Step = 0 | 1 | 2;
+
+const PASSWORD_RULES = [
+  { test: (pw: string) => pw.length >= 8, label: "Mínimo 8 caracteres" },
+  { test: (pw: string) => /[A-Z]/.test(pw), label: "Una letra mayúscula" },
+  { test: (pw: string) => /\d/.test(pw), label: "Un numero" },
+  { test: (pw: string) => /[!@#$%^&*]/.test(pw), label: "Un carácter especial (!@#$%^&*)" },
+];
+
+function validatePassword(pw: string): string | null {
+  if (pw.length < 8) return "Mínimo 8 caracteres";
+  if (pw.length > 128) return "Máximo 128 caracteres";
+  if (!/[A-Z]/.test(pw)) return "Debe tener al menos una mayúscula";
+  if (!/\d/.test(pw)) return "Debe tener al menos un numero";
+  if (!/[!@#$%^&*]/.test(pw)) return "Debe tener un carácter especial (!@#$%^&*)";
+  return null;
+}
+
+const STEPS = ["Email", "Código", "Nueva clave"];
+const STEP_ICONS = [Mail, KeyRound, ShieldCheck];
+
+export default function ForgotPassword() {
+  const [, setLocation] = useLocation();
+  const [step, setStep] = useState<Step>(0);
+  const [email, setEmail] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const forgotMutation = (trpc as any).auth.forgotPassword.useMutation({
+    onSuccess: (data: any) => {
+      setMessage(data.message);
+      setStep(1);
+      setError("");
+    },
+    onError: (err: any) => setError(err.message),
+  });
+
+  const verifyOtpMutation = (trpc as any).auth.verifyRecoveryOtp.useMutation({
+    onSuccess: () => {
+      setStep(2);
+      setError("");
+    },
+    onError: (err: any) => setError(err.message),
+  });
+
+  const resetMutation = (trpc as any).auth.resetPassword.useMutation({
+    onSuccess: () => {
+      setLocation("/login");
+    },
+    onError: (err: any) => setError(err.message),
+  });
+
+  const handleEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!email.trim()) {
+      setError("Ingresa tu email.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("El email no tiene un formato valido.");
+      return;
+    }
+    forgotMutation.mutate({ email: email.trim() });
+  };
+
+  const handleOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (codigo.length !== 6) {
+      setError("El código debe tener 6 dígitos.");
+      return;
+    }
+    verifyOtpMutation.mutate({ email: email.trim(), codigo });
+  };
+
+  const handleReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const pwError = validatePassword(newPassword);
+    if (pwError) {
+      setError(pwError);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+    resetMutation.mutate({ email: email.trim(), codigo, newPassword });
+  };
+
+  const handleKeyDetect = (e: React.KeyboardEvent) => {
+    setCapsLock(e.getModifierState("CapsLock"));
+  };
+
+  const allPasswordRulesPass = PASSWORD_RULES.every((r) => r.test(newPassword));
+  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
+
+  const STEP_TITLES = ["Recuperar contraseña", "Código enviado", "Nueva contraseña"];
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+      <ThemeToggleButton size="md" className="absolute top-4 right-4 z-20 bg-card/80 backdrop-blur-sm" />
+      {/* LightRays background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <LightRays
+          raysOrigin="top-center"
+          raysColor="#e5a50a"
+          raysSpeed={1}
+          lightSpread={1}
+          rayLength={2}
+          pulsating={false}
+          fadeDistance={1}
+          saturation={1}
+          followMouse
+          mouseInfluence={0.1}
+          noiseAmount={0}
+          distortion={0}
+        />
+      </div>
+
+      <div className="w-full max-w-[420px] relative z-10">
+        {/* Branding */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_30px_rgba(255,218,49,0.25)] mb-5">
+            <Zap className="w-7 h-7 text-primary-foreground" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {STEP_TITLES[step]}
+          </h1>
+          <p className="text-xs text-muted-foreground font-medium tracking-wide mt-1">
+            BOT Urgentes
+          </p>
+        </div>
+
+        {/* Progress stepper */}
+        <div className="flex items-center justify-center gap-1.5 mb-6">
+          {STEPS.map((s, i) => {
+            const Icon = STEP_ICONS[i];
+            return (
+              <div key={s} className="flex items-center gap-1.5">
+                <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[9px] font-medium uppercase tracking-wide transition-colors ${
+                  i <= step
+                    ? "bg-primary/15 text-primary border border-primary/30"
+                    : "bg-muted/30 text-muted-foreground border border-border/30"
+                }`}>
+                  <Icon className={`w-3 h-3 ${i < step ? "text-primary" : ""}`} />
+                  <span className="hidden sm:inline">{s}</span>
+                </div>
+                {i < STEPS.length - 1 && (
+                  <div className={`w-4 h-px ${i < step ? "bg-primary/50" : "bg-border/50"}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <Card className="border-border/50 bg-card/80 backdrop-blur-sm shadow-2xl">
+          <CardContent className="pt-6">
+            {/* Step 0: Email */}
+            {step === 0 && (
+              <form onSubmit={handleEmail} className="space-y-5">
+                <p className="text-xs text-muted-foreground text-center leading-relaxed">
+                  Ingresa tu email y te enviaremos un código para restablecer tu contraseña.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                    placeholder="tu@email.com"
+                    maxLength={255}
+                    autoComplete="email"
+                    autoFocus
+                    className="h-11 bg-background/50 border-border/50 focus:border-primary/50"
+                  />
+                </div>
+
+                {error && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2.5">
+                    <p className="text-[12px] text-destructive font-medium text-center">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all font-semibold cursor-pointer"
+                  disabled={forgotMutation.isPending}
+                >
+                  {forgotMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      Enviando...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Enviar código
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
+                  )}
+                </Button>
+              </form>
+            )}
+
+            {/* Step 1: OTP */}
+            {step === 1 && (
+              <form onSubmit={handleOtp} className="space-y-5">
+                {message && (
+                  <p className="text-xs text-muted-foreground text-center leading-relaxed">{message}</p>
+                )}
+
+                <div className="space-y-3">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide text-center block">
+                    Código de recuperación
+                  </Label>
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={codigo}
+                      onChange={(val) => { setCodigo(val); setError(""); }}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} className="h-12 w-12 text-lg font-bold bg-background/50 border-border/50" />
+                        <InputOTPSlot index={1} className="h-12 w-12 text-lg font-bold bg-background/50 border-border/50" />
+                        <InputOTPSlot index={2} className="h-12 w-12 text-lg font-bold bg-background/50 border-border/50" />
+                      </InputOTPGroup>
+                      <span className="text-muted-foreground mx-1">-</span>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={3} className="h-12 w-12 text-lg font-bold bg-background/50 border-border/50" />
+                        <InputOTPSlot index={4} className="h-12 w-12 text-lg font-bold bg-background/50 border-border/50" />
+                        <InputOTPSlot index={5} className="h-12 w-12 text-lg font-bold bg-background/50 border-border/50" />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2.5">
+                    <p className="text-[12px] text-destructive font-medium text-center">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all font-semibold cursor-pointer"
+                  disabled={codigo.length !== 6 || verifyOtpMutation.isPending}
+                >
+                  {verifyOtpMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      Verificando...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Continuar
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
+                  )}
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={() => { setStep(0); setError(""); setCodigo(""); }}
+                  className="w-full text-xs text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-1.5 font-medium tracking-wide cursor-pointer"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Volver atrás
+                </button>
+              </form>
+            )}
+
+            {/* Step 2: New password */}
+            {step === 2 && (
+              <form onSubmit={handleReset} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Nueva contraseña
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="newPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => { setNewPassword(e.target.value); setError(""); }}
+                      onKeyDown={handleKeyDetect}
+                      onKeyUp={handleKeyDetect}
+                      placeholder="Min. 8 caracteres"
+                      className="h-11 pr-11 bg-background/50 border-border/50 focus:border-primary/50"
+                      autoComplete="new-password"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5 cursor-pointer"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {capsLock && (
+                    <p className="text-[11px] text-amber-700 dark:text-primary flex items-center gap-1.5">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      Bloq Mayus activado
+                    </p>
+                  )}
+                  {newPassword.length > 0 && (
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 pt-1">
+                      {PASSWORD_RULES.map((rule) => {
+                        const pass = rule.test(newPassword);
+                        return (
+                          <p key={rule.label} className={`text-[11px] flex items-center gap-1 ${pass ? "text-green-500" : "text-muted-foreground"}`}>
+                            {pass ? <CheckCircle2 className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
+                            {rule.label}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Confirmar contraseña
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirm ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
+                      onKeyDown={handleKeyDetect}
+                      onKeyUp={handleKeyDetect}
+                      placeholder="Repetí tu contraseña"
+                      className="h-11 pr-11 bg-background/50 border-border/50 focus:border-primary/50"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm(!showConfirm)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5 cursor-pointer"
+                      tabIndex={-1}
+                    >
+                      {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {confirmPassword.length > 0 && !passwordsMatch && (
+                    <p className="text-[11px] text-destructive flex items-center gap-1">
+                      <X className="h-3 w-3 shrink-0" />
+                      Las contraseñas no coinciden
+                    </p>
+                  )}
+                  {passwordsMatch && (
+                    <p className="text-[11px] text-green-500 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 shrink-0" />
+                      Las contraseñas coinciden
+                    </p>
+                  )}
+                </div>
+
+                {error && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2.5">
+                    <p className="text-[12px] text-destructive font-medium text-center">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full h-11 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all font-semibold cursor-pointer"
+                  disabled={resetMutation.isPending || !allPasswordRulesPass || !passwordsMatch}
+                >
+                  {resetMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      Actualizando...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Cambiar contraseña
+                      <ShieldCheck className="h-4 w-4" />
+                    </span>
+                  )}
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Bottom link */}
+        <div className="flex flex-col items-center gap-3 mt-6">
+          <button
+            onClick={() => setLocation("/login")}
+            className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5 font-medium tracking-wide cursor-pointer"
+          >
+            <LogIn className="h-3 w-3" />
+            Volver al login
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
