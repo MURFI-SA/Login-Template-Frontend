@@ -31,5 +31,5 @@ if (!global.PointerEvent) {
       super(type, params);
       this.pointerId = params.pointerId || 0;
     }
-  } as any;
+  } as unknown as typeof PointerEvent;
 }

@@ -52,9 +52,12 @@ vi.mock('@/lib/trpc', () => {
           useMutation: vi.fn().mockImplementation((options) => ({ 
             mutate: (vars: any) => {
               mockForgotMutate(vars);
-              if (options?.onSuccess) options.onSuccess({ message: "check your email" });
-            }, 
-            isPending: false 
+              if (vars.email === 'error@example.com') {
+                if (options?.onError) options.onError({ message: 'Usuario no encontrado' });
+              } else if (options?.onSuccess) {
+                options.onSuccess({ message: 'Success' });
+              }
+            },isPending: false 
           })) 
         },
         resetPassword: { 
@@ -139,7 +142,8 @@ describe('ForgotPassword', () => {
     
     // Verify mock called
     expect(mockForgotMutate).toHaveBeenCalledWith({ email: 'test@example.com' });
-    
+
+
     // Step 1: Submit OTP
     const otpInputEl = await screen.findByTestId('otp-input');
     fireEvent.change(otpInputEl, { target: { value: '123456' } });
@@ -159,5 +163,57 @@ describe('ForgotPassword', () => {
     fireEvent.submit(resetBtn.closest('form')!);
     
     expect(mockResetMutate).toHaveBeenCalledWith({ email: 'test@example.com', codigo: '123456', newPassword: 'StrongPass1!' });
+  });
+
+  it('handles API errors', async () => {
+    render(<ForgotPassword />);
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText('tu@email.com'), 'error@example.com');
+    fireEvent.submit(screen.getByRole('button', { name: /Enviar código/i }).closest('form')!);
+    expect(await screen.findByText('Usuario no encontrado')).toBeInTheDocument();
+  });
+
+  it('validates OTP length', async () => {
+    render(<ForgotPassword />);
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText('tu@email.com'), 'test@example.com');
+    fireEvent.submit(screen.getByRole('button', { name: /Enviar código/i }).closest('form')!);
+    
+    const otpInputEl = await screen.findByTestId('otp-input');
+    fireEvent.change(otpInputEl, { target: { value: '123' } }); // < 6 chars
+    const submitOtpBtn = await screen.findByRole('button', { name: /Continuar/i });
+    fireEvent.submit(submitOtpBtn.closest('form')!);
+    
+    expect(await screen.findByText('El código debe tener 6 dígitos.')).toBeInTheDocument();
+  });
+
+  it('validates new password match and strength', async () => {
+    render(<ForgotPassword />);
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText('tu@email.com'), 'test@example.com');
+    fireEvent.submit(screen.getByRole('button', { name: /Enviar código/i }).closest('form')!);
+    
+    const otpInputEl = await screen.findByTestId('otp-input');
+    fireEvent.change(otpInputEl, { target: { value: '123456' } });
+    const submitOtpBtn = await screen.findByRole('button', { name: /Continuar/i });
+    fireEvent.submit(submitOtpBtn.closest('form')!);
+    
+    const newPasswordInput = await screen.findByLabelText(/Nueva contraseña/i);
+    const confirmPasswordInput = await screen.findByLabelText(/Confirmar contraseña/i);
+    
+    // Mismatch
+    await user.clear(newPasswordInput);
+    await user.type(newPasswordInput, 'StrongPass1!');
+    await user.clear(confirmPasswordInput);
+    await user.type(confirmPasswordInput, 'StrongPass2!');
+    fireEvent.submit(screen.getByRole('button', { name: /Cambiar contraseña/i }).closest('form')!);
+    expect(await screen.findByText('Las contraseñas no coinciden.')).toBeInTheDocument();
+
+  });
+
+  it("clicks return to login", () => {
+    render(<ForgotPassword />);
+    const returnLink = screen.getByText("Volver al login");
+    fireEvent.click(returnLink);
   });
 });
