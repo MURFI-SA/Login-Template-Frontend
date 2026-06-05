@@ -1,6 +1,10 @@
 import { trpc } from "@/lib/trpc";
 import { useCallback, useMemo } from "react";
 
+// tRPC client is typed as AnyRouter; cast once to avoid repeated `as any`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const typedTrpc = trpc as any;
+
 // Cookie is HttpOnly — managed by the backend.
 // We just track if user has logged in during this browser session.
 const SESSION_KEY = "auth_active";
@@ -24,12 +28,12 @@ export function clearAuthActive() {
 }
 
 export function useAuth() {
-    const utils = (trpc as any).useUtils();
+    const utils = typedTrpc.useUtils();
 
     // Always fire the me query — the auth cookie is HttpOnly so JS cannot
     // detect it via document.cookie or sessionStorage after a page refresh.
     // If no cookie → server returns UNAUTHORIZED → main.tsx redirects to /login.
-    const meQuery = (trpc as any).auth.me.useQuery(undefined, {
+    const meQuery = typedTrpc.auth.me.useQuery(undefined, {
         retry: 3,
         refetchOnWindowFocus: true,
         refetchInterval: 30 * 60 * 1000,
@@ -37,12 +41,15 @@ export function useAuth() {
 
     const logout = useCallback(async () => {
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (utils as any).client.auth.logout.mutate();
         } catch {
             // ignore
         }
         clearAuthActive();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (utils as any).auth.me.setData(undefined, null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (utils as any).auth.me.invalidate();
     }, [utils]);
 

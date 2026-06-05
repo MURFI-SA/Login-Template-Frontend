@@ -104,6 +104,7 @@ function DialogContent({
     (e: KeyboardEvent) => {
       // Check both the native isComposing property and our context state
       // This handles Safari's timing issues with composition events
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const isCurrentlyComposing = (e as any).isComposing || isComposing();
 
       // If IME is composing, prevent dialog from closing

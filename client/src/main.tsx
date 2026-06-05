@@ -46,6 +46,8 @@ queryClient.getMutationCache().subscribe(event => {
 // AppRouter is typed as AnyRouter in `types/api.ts` (no concrete backend type
 // available in this template). Cast to `any` so .createClient / .Provider
 // resolve. Replace AppRouter with a real import for full type safety.
+// tRPC client is typed as AnyRouter; cast required for .createClient / .Provider
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const trpcAny = trpc as any;
 const trpcClient = trpcAny.createClient({
   links: [

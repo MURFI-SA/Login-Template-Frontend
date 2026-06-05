@@ -10,6 +10,10 @@ import { Zap, Eye, EyeOff, AlertTriangle, CheckCircle2, X, ArrowRight, ArrowLeft
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import LightRays from "@/components/ui/LightRays";
 
+// tRPC client is typed as AnyRouter; cast once to avoid repeated `as any`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const typedTrpc = trpc as any;
+
 type Step = 0 | 1 | 2;
 
 const PASSWORD_RULES = [
@@ -43,28 +47,28 @@ export default function ForgotPassword() {
   const [capsLock, setCapsLock] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const forgotMutation = (trpc as any).auth.forgotPassword.useMutation({
-    onSuccess: (data: any) => {
+  const forgotMutation = typedTrpc.auth.forgotPassword.useMutation({
+    onSuccess: (data: { message: string }) => {
       setMessage(data.message);
       setStep(1);
       setError("");
     },
-    onError: (err: any) => setError(err.message),
+    onError: (err: { message: string }) => setError(err.message),
   });
 
-  const verifyOtpMutation = (trpc as any).auth.verifyRecoveryOtp.useMutation({
+  const verifyOtpMutation = typedTrpc.auth.verifyRecoveryOtp.useMutation({
     onSuccess: () => {
       setStep(2);
       setError("");
     },
-    onError: (err: any) => setError(err.message),
+    onError: (err: { message: string }) => setError(err.message),
   });
 
-  const resetMutation = (trpc as any).auth.resetPassword.useMutation({
+  const resetMutation = typedTrpc.auth.resetPassword.useMutation({
     onSuccess: () => {
       setLocation("/login");
     },
-    onError: (err: any) => setError(err.message),
+    onError: (err: { message: string }) => setError(err.message),
   });
 
   const handleEmail = (e: React.FormEvent) => {
@@ -74,7 +78,8 @@ export default function ForgotPassword() {
       setError("Ingresa tu email.");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+     
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
       setError("El email no tiene un formato valido.");
       return;
     }

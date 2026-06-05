@@ -10,6 +10,10 @@ import { Zap, Eye, EyeOff, AlertTriangle, CheckCircle2, X, ArrowRight, ArrowLeft
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import LightRays from "@/components/ui/LightRays";
 
+// tRPC client is typed as AnyRouter; cast once to avoid repeated `as any`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const typedTrpc = trpc as any;
+
 const PASSWORD_RULES = [
   { test: (pw: string) => pw.length >= 8, label: "Mínimo 8 caracteres" },
   { test: (pw: string) => /[A-Z]/.test(pw), label: "Una letra mayúscula" },
@@ -28,6 +32,12 @@ function validatePassword(pw: string): string | null {
 
 const STEPS = ["Datos", "Verificar"];
 
+function getStepBadgeClass(i: number, currentStep: number): string {
+  if (i < currentStep) return "bg-primary text-primary-foreground";
+  if (i === currentStep) return "bg-primary/30 text-primary";
+  return "bg-muted text-muted-foreground";
+}
+
 export default function Register() {
   const [, setLocation] = useLocation();
   const [step, setStep] = useState<0 | 1>(0);
@@ -40,20 +50,20 @@ export default function Register() {
   const [codigo, setCodigo] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const registerMutation = (trpc as any).auth.register.useMutation({
-    onSuccess: (data: any) => {
+  const registerMutation = typedTrpc.auth.register.useMutation({
+    onSuccess: (data: { message: string }) => {
       setMessage(data.message);
       setStep(1);
       setError("");
     },
-    onError: (err: any) => setError(err.message),
+    onError: (err: { message: string }) => setError(err.message),
   });
 
-  const verifyMutation = (trpc as any).auth.verifyEmail.useMutation({
+  const verifyMutation = typedTrpc.auth.verifyEmail.useMutation({
     onSuccess: () => {
       setLocation("/login");
     },
-    onError: (err: any) => setError(err.message),
+    onError: (err: { message: string }) => setError(err.message),
   });
 
   const handleRegister = (e: React.FormEvent) => {
@@ -64,7 +74,8 @@ export default function Register() {
       setError("Ingresa tu email.");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+     
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
       setError("El email no tiene un formato valido.");
       return;
     }
@@ -142,9 +153,7 @@ export default function Register() {
                   ? "bg-primary/15 text-primary border border-primary/30"
                   : "bg-muted/30 text-muted-foreground border border-border/30"
               }`}>
-                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                  i < step ? "bg-primary text-primary-foreground" : i === step ? "bg-primary/30 text-primary" : "bg-muted text-muted-foreground"
-                }`}>
+                <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${getStepBadgeClass(i, step)}`}>
                   {i < step ? <CheckCircle2 className="w-3 h-3" /> : i + 1}
                 </span>
                 {s}
