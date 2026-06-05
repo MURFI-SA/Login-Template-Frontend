@@ -10,6 +10,10 @@ import { Zap, Eye, EyeOff, AlertTriangle, ArrowRight, UserPlus, KeyRound } from 
 import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 import LightRays from "@/components/ui/LightRays";
 
+// tRPC client is typed as AnyRouter; cast once to avoid repeated `as any`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const typedTrpc = trpc as any;
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
@@ -18,15 +22,16 @@ export default function Login() {
   const [capsLock, setCapsLock] = useState(false);
   const [error, setError] = useState("");
 
-  const utils = (trpc as any).useUtils();
+  const utils = typedTrpc.useUtils();
 
-  const loginMutation = (trpc as any).auth.login.useMutation({
-    onSuccess: async (data: any) => {
+  const loginMutation = typedTrpc.auth.login.useMutation({
+    onSuccess: async (data: { token: string }) => {
       setAuthToken(data.token);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (utils as any).auth.me.invalidate();
       setLocation("/");
     },
-    onError: (err: any) => {
+    onError: (err: { message: string }) => {
       setError(err.message);
     },
   });
@@ -39,7 +44,8 @@ export default function Login() {
       setError("Ingresa tu email.");
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+     
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
       setError("El email no tiene un formato valido.");
       return;
     }
