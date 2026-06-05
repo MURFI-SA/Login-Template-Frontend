@@ -10,7 +10,7 @@ export default defineConfig({
     setupFiles: ["./client/src/test/setup.ts"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "html"],
+      reporter: ["text", "json", "html", "lcov"],
       include: ["client/src/**/*.ts", "client/src/**/*.tsx"],
       exclude: [
         "client/src/main.tsx",
