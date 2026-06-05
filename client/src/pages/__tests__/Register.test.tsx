@@ -6,8 +6,12 @@ import Register from '../Register';
 const mockRegisterMutate = vi.fn();
 const mockVerifyMutate = vi.fn();
 
+const { mockSetLocation } = vi.hoisted(() => ({
+  mockSetLocation: vi.fn(),
+}));
+
 vi.mock('wouter', () => ({
-  useLocation: () => ['/current-path', vi.fn()]
+  useLocation: () => ['/current-path', mockSetLocation]
 }));
 
 vi.mock('@/lib/trpc', () => {
@@ -78,10 +82,11 @@ describe('Register Component', () => {
     vi.clearAllMocks();
   });
 
-  it("clicks return to login", () => {
+  it('clicks return to login', () => {
     render(<Register />);
-    const loginLink = screen.getByText("Ya tengo cuenta");
-    fireEvent.click(loginLink);
+    const returnLink = screen.getByText('Ya tengo cuenta');
+    fireEvent.click(returnLink);
+    expect(mockSetLocation).toHaveBeenCalledWith('/login');
   });
 
   it('renders correctly', () => {

@@ -28,8 +28,12 @@ vi.mock('@/components/ui/input-otp', () => ({
 }));
 
 // Mock wouter
+const { mockSetLocation } = vi.hoisted(() => ({
+  mockSetLocation: vi.fn(),
+}));
+
 vi.mock('wouter', () => ({
-  useLocation: () => ['/forgot-password', vi.fn()]
+  useLocation: () => ['/forgot-password', mockSetLocation]
 }));
 
 // Mock tRPC
@@ -215,5 +219,6 @@ describe('ForgotPassword', () => {
     render(<ForgotPassword />);
     const returnLink = screen.getByText("Volver al login");
     fireEvent.click(returnLink);
+    expect(mockSetLocation).toHaveBeenCalledWith('/login');
   });
 });
