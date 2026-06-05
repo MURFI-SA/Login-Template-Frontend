@@ -23,7 +23,9 @@ vi.mock('@/lib/trpc', () => {
           useMutation: vi.fn().mockImplementation((options) => ({ 
             mutate: (vars: any) => {
               mockLoginMutate(vars);
-              if (options?.onSuccess) {
+              if (vars.email === 'error@example.com') {
+                if (options?.onError) options.onError({ message: 'Credenciales invalidas' });
+              } else if (options?.onSuccess) {
                 options.onSuccess({ token: 'fake-token' });
               }
             }, 
@@ -104,4 +106,36 @@ describe('Login Component', () => {
       expect(mockLoginMutate).toHaveBeenCalledWith({ email: 'test@example.com', password: 'Password123!' });
     });
   });
+
+  it('shows error message on API failure', async () => {
+    render(<Login />);
+    const emailInput = screen.getByLabelText(/Email/i);
+    const passwordInput = screen.getByLabelText(/Contraseña/i);
+    
+    await userEvent.type(emailInput, 'error@example.com');
+    await userEvent.type(passwordInput, 'Password123!');
+    
+    const button = screen.getByRole('button', { name: /Iniciar sesión/i });
+    fireEvent.submit(button.closest('form')!);
+
+    expect(await screen.findByText('Credenciales invalidas')).toBeInTheDocument();
+  });
+
+  it("clicks all links and toggles password visibility", () => {
+    render(<Login />);
+        
+        // Toggle password
+        const toggleBtn = screen.getByRole("button", { name: "" }); // the eye icon has no name
+        fireEvent.click(toggleBtn);
+        expect(screen.getByPlaceholderText("Tu contraseña")).toHaveAttribute("type", "text");
+        fireEvent.click(toggleBtn);
+        expect(screen.getByPlaceholderText("Tu contraseña")).toHaveAttribute("type", "password");
+
+        // Links
+        const forgotLink = screen.getByText("Olvidé mi contraseña");
+        fireEvent.click(forgotLink);
+
+        const registerLink = screen.getByText("Crear cuenta");
+        fireEvent.click(registerLink);
+    });
 });

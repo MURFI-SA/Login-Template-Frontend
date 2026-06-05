@@ -25,8 +25,10 @@ vi.mock('@/lib/trpc', () => {
           useMutation: vi.fn().mockImplementation((options) => ({ 
             mutate: (vars: any) => {
               mockRegisterMutate(vars);
-              if (options?.onSuccess) {
-                options.onSuccess({ message: 'Success message' });
+              if (vars.email === 'error@example.com') {
+                if (options?.onError) options.onError({ message: 'Email ya en uso' });
+              } else if (options?.onSuccess) {
+                options.onSuccess({ message: 'Success' });
               }
             }, 
             isPending: false 
@@ -74,6 +76,12 @@ vi.mock('@/components/ui/input-otp', () => ({
 describe('Register Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("clicks return to login", () => {
+    render(<Register />);
+    const loginLink = screen.getByText("Ya tengo cuenta");
+    fireEvent.click(loginLink);
   });
 
   it('renders correctly', () => {
@@ -143,5 +151,33 @@ describe('Register Component', () => {
     fireEvent.submit(verifyBtn.closest('form')!);
     
     expect(mockVerifyMutate).toHaveBeenCalledWith({ email: 'test@example.com', codigo: '123456' });
+  });
+
+  it('shows error when passwords do not match', async () => {
+    render(<Register />);
+    const emailInput = screen.getByLabelText(/Email/i);
+    const passwordInput = screen.getByLabelText(/Contrasena/i);
+    const confirmInput = screen.getByLabelText(/Repetir contraseña/i);
+    
+    await userEvent.type(emailInput, 'test@example.com');
+    await userEvent.type(passwordInput, 'Password123!');
+    await userEvent.type(confirmInput, 'Password1234!');
+    
+    const button = screen.getByRole('button', { name: /Continuar/i });
+    fireEvent.submit(button.closest('form')!);
+    
+    expect(await screen.findByText('Las contraseñas no coinciden')).toBeInTheDocument();
+  });
+
+  it('shows error on API failure', async () => {
+    render(<Register />);
+    
+    await userEvent.type(screen.getByLabelText(/Email/i), 'error@example.com');
+    await userEvent.type(screen.getByLabelText(/Contrasena/i), 'Password123!');
+    await userEvent.type(screen.getByLabelText(/Repetir contraseña/i), 'Password123!');
+    
+    fireEvent.submit(screen.getByRole('button', { name: /Continuar/i }).closest('form')!);
+
+    expect(await screen.findByText('Email ya en uso')).toBeInTheDocument();
   });
 });
